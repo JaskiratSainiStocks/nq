@@ -1,17 +1,17 @@
-name: Automated Pre-School Trading Bot
+name: Daily Data Task
 
 on:
   schedule:
-    # 1. London Pre-US: 09:00 UTC (05:00 AM EST / 02:00 AM PST)
+    # 1. Window 1: 09:00 UTC (05:00 AM EST / 02:00 AM PST)
     - cron: '0 9 * * 1-5'
-    # 2. NY Morning: 14:00 UTC (10:00 AM EST / 07:00 AM PST)
+    # 2. Window 2: 14:00 UTC (10:00 AM EST / 07:00 AM PST)
     - cron: '0 14 * * 1-5'
-    # 3. NY Afternoon: 17:00 UTC (01:00 PM EST / 10:00 AM PST)
+    # 3. Window 3: 17:00 UTC (01:00 PM EST / 10:00 AM PST)
     - cron: '0 17 * * 1-5'
-  workflow_dispatch: # Allows manual 1-click test execution anytime!
+  workflow_dispatch:
 
 jobs:
-  run-bot:
+  run-task:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -27,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install yfinance pandas numpy requests matplotlib polars
 
-      - name: Execute Master Model 3.0 Bot
+      - name: Execute Main Script
         env:
           TICKSTREAM_API_KEY: ${{ secrets.TICKSTREAM_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -38,4 +38,4 @@ jobs:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: |
-          python app.py
+          python main.py
