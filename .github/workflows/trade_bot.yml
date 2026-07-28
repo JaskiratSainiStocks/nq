@@ -25,9 +25,9 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install yfinance pandas numpy requests
+          pip install yfinance pandas numpy requests matplotlib
 
-      - name: Execute Master Model 3.0 Bot
+      - name: Execute Master Model 3.0 Ultimate Bot
         env:
           TICKSTREAM_API_KEY: ${{ secrets.TICKSTREAM_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -35,5 +35,7 @@ jobs:
           TRADOVATE_USER: ${{ secrets.TRADOVATE_USER }}
           TRADOVATE_PASS: ${{ secrets.TRADOVATE_PASS }}
           TRADOVATE_ACCOUNT_ID: ${{ secrets.TRADOVATE_ACCOUNT_ID }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: |
           python auto_bot.py
