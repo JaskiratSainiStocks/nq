@@ -4,14 +4,13 @@ import numpy as np
 import requests
 import json
 import os
-import time
 import datetime
 
-print("=" * 85)
-print("🤖 MASTER BOT v6.0 PRODUCTION ENGINE: TRADOVATE API + GEX + NOTION")
-print("=" * 85)
+print("=" * 80)
+print("🤖 INSTANT PRODUCTION BOT: IMMEDIATE TELEGRAM PUSH + MASTER 3.0")
+print("=" * 80)
 
-# Load Encrypted Secrets from GitHub Environment
+# Load Encrypted Secrets
 TICKSTREAM_API_KEY = os.environ.get("TICKSTREAM_API_KEY")
 TRADOVATE_USER = os.environ.get("TRADOVATE_USER")
 TRADOVATE_PASS = os.environ.get("TRADOVATE_PASS")
@@ -21,7 +20,7 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 NOTION_API_KEY = os.environ.get("NOTION_API_KEY")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID")
 
-PROXIMITY_BUFFER = 10.0 # 10 NQ Points / 40 Ticks Flexible Buffer
+PROXIMITY_BUFFER = 10.0 # 10 NQ Points / 40 Ticks Buffer
 
 def get_cme_contract_symbol(dt_obj=None):
     if dt_obj is None: dt_obj = datetime.datetime.utcnow()
@@ -48,9 +47,14 @@ def send_telegram_alert(message_text):
     try:
         res = requests.post(telegram_url, json=payload, timeout=5)
         if res.status_code == 200:
-            print("📱 Telegram Push Notification Sent!")
+            print("📱 Telegram Notification Sent Successfully!")
+        else:
+            print(f"⚠️ Telegram Error Response: {res.json()}")
     except Exception as e:
-        print(f"❌ Telegram Error: {e}")
+        print(f"❌ Telegram Connection Error: {e}")
+
+# 🚀 INSTANT BOOTUP NOTIFICATION (Fires within 3 seconds!)
+send_telegram_alert(f"🚀 <b>NQ MASTER BOT 3.0 ONLINE & ACTIVE!</b>\n\nChecking market structure & GEX levels...")
 
 def check_telegram_remote_commands(current_px, gamma_f, is_pos_gamma, prev_poc):
     if not TELEGRAM_BOT_TOKEN: return "RUN"
@@ -67,8 +71,7 @@ def check_telegram_remote_commands(current_px, gamma_f, is_pos_gamma, prev_poc):
                         f"💵 <b>Current Price:</b> ${current_px:,.2f}\n"
                         f"📊 <b>Yesterday's POC:</b> ${prev_poc:,.2f}\n"
                         f"🟦 <b>Gamma Flip:</b> ${gamma_f:,.2f} ({'POS GAMMA ✅' if is_pos_gamma else 'NEG GAMMA 🛑'})\n"
-                        f"📈 <b>Active Contract:</b> {CONTRACT_SYMBOL}\n"
-                        f"🤖 <b>Bot Status:</b> Active & Listening 24/7!"
+                        f"🤖 <b>Bot Status:</b> Active 24/7!"
                     )
                     send_telegram_alert(status_reply)
                     return "RUN"
@@ -138,7 +141,7 @@ def fetch_tickstream_gex(spot_price):
     return call_w, put_w, gamma_f
 
 # ---------------------------------------------------------------------
-# 4. TRADOVATE LIVE EXECUTION ENGINE WITH ACCOUNT AUTO-DISCOVERY
+# 4. TRADOVATE EXECUTION ENGINE
 # ---------------------------------------------------------------------
 def execute_tradovate_order(action, entry_px, sl_pts, tp_px, window_name):
     sl_px = entry_px - sl_pts if action.lower() == "buy" else entry_px + sl_pts
@@ -154,45 +157,25 @@ def execute_tradovate_order(action, entry_px, sl_pts, tp_px, window_name):
     )
     
     if not TRADOVATE_USER or not TRADOVATE_PASS:
-        print("\n🧪 SIMULATION MODE: Running without Tradovate keys.")
         send_telegram_alert(f"🧪 <b>SIMULATION EXECUTION</b>\n\n{trade_summary}")
         log_trade_to_notion(str(datetime.date.today()), "06:35 AM PST", "WIN 🎯", action, 600.0, 5)
         return True
 
-    print("\n🔐 Authenticating with Tradovate API...")
     auth_url = "https://demo.tradovateapi.com/v1/auth/accesstokenrequest"
-    auth_payload = {"name": TRADOVATE_USER, "password": TRADOVATE_PASS, "appId": "NQ_Master_Bot_v6", "appVersion": "6.0"}
+    auth_payload = {"name": TRADOVATE_USER, "password": TRADOVATE_PASS, "appId": "NQ_Master_Bot_v5", "appVersion": "5.3"}
     
     try:
         res = requests.post(auth_url, json=auth_payload, timeout=10)
         auth_data = res.json()
-        
-        if "accessToken" not in auth_data:
-            err_msg = auth_data.get("errorText", "Invalid User/Pass")
-            send_telegram_alert(f"❌ <b>TRADOVATE LOGIN FAILED:</b> {err_msg}")
-            return False
+        if "accessToken" not in auth_data: return False
             
         access_token = auth_data["accessToken"]
         headers = {"Authorization": f"Bearer {access_token}"}
-        
-        # Auto-Discover Tradovate Account ID
-        acct_url = "https://demo.tradovateapi.com/v1/account/list"
-        acct_res = requests.get(acct_url, headers=headers, timeout=10)
-        accts = acct_res.json()
-        
-        account_id = None
-        if isinstance(accts, list) and len(accts) > 0:
-            account_id = accts[0].get("id")
-            print(f"✅ Auto-Discovered Tradovate Account ID: {account_id}")
-
-        if not account_id:
-            account_id = int(TRADOVATE_ACCOUNT_ID) if TRADOVATE_ACCOUNT_ID and TRADOVATE_ACCOUNT_ID.isdigit() else 0
-
-        # Place Bracket Market Entry
         order_url = "https://demo.tradovateapi.com/v1/order/placeorder"
+        
         order_payload = {
             "accountSpec": TRADOVATE_USER,
-            "accountId": account_id,
+            "accountId": int(TRADOVATE_ACCOUNT_ID) if TRADOVATE_ACCOUNT_ID and TRADOVATE_ACCOUNT_ID.isdigit() else 0,
             "action": action,
             "symbol": CONTRACT_SYMBOL,
             "orderQty": 5,
@@ -201,8 +184,6 @@ def execute_tradovate_order(action, entry_px, sl_pts, tp_px, window_name):
         }
         
         order_res = requests.post(order_url, json=order_payload, headers=headers)
-        print(f"🚀 TRADOVATE ORDER RESPONSE: {order_res.json()}")
-        
         send_telegram_alert(f"⚡ <b>LIVE ORDER FIRED ACROSS FLEET!</b>\n\n{trade_summary}")
         log_trade_to_notion(str(datetime.date.today()), "06:35 AM PST", "WIN 🎯", action, 600.0, 5)
         return True
@@ -212,122 +193,115 @@ def execute_tradovate_order(action, entry_px, sl_pts, tp_px, window_name):
         return False
 
 # ---------------------------------------------------------------------
-# 5. 60-MINUTE CONTINUOUS LIVE WATCHER LOOP
+# 5. MARKET DATA CHECK & MASTER MODEL 3.0 EVALUATION
 # ---------------------------------------------------------------------
-print("⚡ Starting 60-Minute Live Window Watcher Loop...")
+ticker = yf.Ticker("NQ=F")
+df = ticker.history(period="5d", interval="5m")
 
-loop_start_time = datetime.datetime.now()
-trade_executed_today = False
+if not df.empty:
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
 
-while (datetime.datetime.now() - loop_start_time).seconds < 3000:
-    ticker = yf.Ticker("NQ=F")
-    df = ticker.history(period="5d", interval="5m")
+    df.index = df.index.tz_convert("America/New_York")
+    df["date"] = df.index.date
+    df["time"] = df.index.time
 
-    if not df.empty:
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+    unique_dates = sorted(list(set(df["date"])))
+    if len(unique_dates) >= 2:
+        today_date = unique_dates[-1]
+        prev_date = unique_dates[-2]
 
-        df.index = df.index.tz_convert("America/New_York")
-        df["date"] = df.index.date
-        df["time"] = df.index.time
+        prev_df = df[df["date"] == prev_date]
+        pv = (prev_df["Close"] * prev_df["Volume"]).sum()
+        vwap = pv / max(1, prev_df["Volume"].sum())
 
-        unique_dates = sorted(list(set(df["date"])))
-        if len(unique_dates) >= 2:
-            today_date = unique_dates[-1]
-            prev_date = unique_dates[-2]
+        prices, vols = prev_df["Close"].values, prev_df["Volume"].values
+        poc_idx = np.argmax(vols)
+        prev_poc = prices[poc_idx]
 
-            prev_df = df[df["date"] == prev_date]
-            pv = (prev_df["Close"] * prev_df["Volume"]).sum()
-            vwap = pv / max(1, prev_df["Volume"].sum())
+        target_va_vol = prev_df["Volume"].sum() * 0.6827
+        va_vol = vols[poc_idx]
+        up = dn = poc_idx
+        while va_vol < target_va_vol and (up < len(prices) - 1 or dn > 0):
+            next_up = vols[up + 1] if up < len(prices) - 1 else 0
+            next_dn = vols[dn - 1] if dn > 0 else 0
+            if next_up >= next_dn: up += 1; va_vol += next_up
+            else: dn -= 1; va_vol += next_dn
 
-            prices, vols = prev_df["Close"].values, prev_df["Volume"].values
-            poc_idx = np.argmax(vols)
-            prev_poc = prices[poc_idx]
+        prev_vah, prev_val = prices[up], prices[dn]
 
-            target_va_vol = prev_df["Volume"].sum() * 0.6827
-            va_vol = vols[poc_idx]
-            up = dn = poc_idx
-            while va_vol < target_va_vol and (up < len(prices) - 1 or dn > 0):
-                next_up = vols[up + 1] if up < len(prices) - 1 else 0
-                next_dn = vols[dn - 1] if dn > 0 else 0
-                if next_up >= next_dn: up += 1; va_vol += next_up
-                else: dn -= 1; va_vol += next_dn
+        today_df = df[df["date"] == today_date].copy()
+        today_df["tp"] = (today_df["High"] + today_df["Low"] + today_df["Close"]) / 3.0
+        today_df["pv"] = today_df["tp"] * today_df["Volume"]
+        today_df["running_vwap"] = today_df["pv"].cumsum() / today_df["Volume"].cumsum()
+        today_df["dev2_v"] = ((today_df["tp"] - today_df["running_vwap"]) ** 2) * today_df["Volume"]
+        today_df["vwap_std"] = np.sqrt(today_df["dev2_v"].cumsum() / today_df["Volume"].cumsum()).clip(lower=15.0)
 
-            prev_vah, prev_val = prices[up], prices[dn]
+        today_df["vwap_lower_15s"] = today_df["running_vwap"] - (today_df["vwap_std"] * 1.5)
+        today_df["vwap_upper_15s"] = today_df["running_vwap"] + (today_df["vwap_std"] * 1.5)
+        today_df["vwap_slope"] = today_df["running_vwap"] - today_df["running_vwap"].shift(3)
 
-            today_df = df[df["date"] == today_date].copy()
-            today_df["tp"] = (today_df["High"] + today_df["Low"] + today_df["Close"]) / 3.0
-            today_df["pv"] = today_df["tp"] * today_df["Volume"]
-            today_df["running_vwap"] = today_df["pv"].cumsum() / today_df["Volume"].cumsum()
-            today_df["dev2_v"] = ((today_df["tp"] - today_df["running_vwap"]) ** 2) * today_df["Volume"]
-            today_df["vwap_std"] = np.sqrt(today_df["dev2_v"].cumsum() / today_df["Volume"].cumsum()).clip(lower=15.0)
+        latest_candle = today_df.iloc[-1]
+        current_px = latest_candle["Close"]
+        current_slope = latest_candle["vwap_slope"]
 
-            today_df["vwap_lower_15s"] = today_df["running_vwap"] - (today_df["vwap_std"] * 1.5)
-            today_df["vwap_upper_15s"] = today_df["running_vwap"] + (today_df["vwap_std"] * 1.5)
-            today_df["vwap_slope"] = today_df["running_vwap"] - today_df["running_vwap"].shift(3)
+        c_open, c_high, c_low, c_close = latest_candle["Open"], latest_candle["High"], latest_candle["Low"], latest_candle["Close"]
+        c_range = max(0.25, c_high - c_low)
+        bottom_wick = min(c_open, c_close) - c_low
+        top_wick = c_high - max(c_open, c_close)
 
-            latest_candle = today_df.iloc[-1]
-            current_px = latest_candle["Close"]
-            current_slope = latest_candle["vwap_slope"]
+        vwap_rising = current_slope > 0.0 if not np.isnan(current_slope) else True
+        vwap_falling = current_slope < 0.0 if not np.isnan(current_slope) else True
 
-            c_open, c_high, c_low, c_close = latest_candle["Open"], latest_candle["High"], latest_candle["Low"], latest_candle["Close"]
-            c_range = max(0.25, c_high - c_low)
-            bottom_wick = min(c_open, c_close) - c_low
-            top_wick = c_high - max(c_open, c_close)
+        v_lower_band = latest_candle["vwap_lower_15s"]
+        v_upper_band = latest_candle["vwap_upper_15s"]
 
-            vwap_rising = current_slope > 0.0 if not np.isnan(current_slope) else True
-            vwap_falling = current_slope < 0.0 if not np.isnan(current_slope) else True
+        call_w, put_w, gamma_f = fetch_tickstream_gex(current_px)
+        is_pos_gamma = current_px > gamma_f
 
-            v_lower_band = latest_candle["vwap_lower_15s"]
-            v_upper_band = latest_candle["vwap_upper_15s"]
+        cmd = check_telegram_remote_commands(current_px, gamma_f, is_pos_gamma, prev_poc)
 
-            call_w, put_w, gamma_f = fetch_tickstream_gex(current_px)
-            is_pos_gamma = current_px > gamma_f
+        t_last = latest_candle["time"]
+        hr, mn = t_last.hour, t_last.minute
 
-            cmd = check_telegram_remote_commands(current_px, gamma_f, is_pos_gamma, prev_poc)
-            if cmd in ["KILL", "PAUSE"]: break
+        is_window_1 = (hr == 10) # NY Morning (07:00 PST)
+        is_window_2 = (hr == 13) # NY Afternoon (10:00 PST)
+        is_window_3 = (hr == 5)  # London Open (02:00 PST)
 
-            t_last = latest_candle["time"]
-            hr, mn = t_last.hour, t_last.minute
+        is_approved_green_window = is_window_1 or is_window_2 or is_window_3
+        window_label = "NY Morning" if is_window_1 else ("NY Afternoon" if is_window_2 else "London Open")
 
-            is_window_1 = (hr == 10) # NY Morning (07:00 PST)
-            is_window_2 = (hr == 13) # NY Afternoon (10:00 PST)
-            is_window_3 = (hr == 5)  # London Open (02:00 PST)
+        pts_to_poc_long = prev_poc - current_px
+        pts_to_poc_short = current_px - prev_poc
 
-            is_approved_green_window = is_window_1 or is_window_2 or is_window_3
-            window_label = "NY Morning" if is_window_1 else ("NY Afternoon" if is_window_2 else "London Open")
+        long_near_val = c_low <= (prev_val + PROXIMITY_BUFFER) or c_low <= (v_lower_band + PROXIMITY_BUFFER)
+        short_near_vah = c_high >= (prev_vah - PROXIMITY_BUFFER) or c_high >= (v_upper_band - PROXIMITY_BUFFER)
 
-            pts_to_poc_long = prev_poc - current_px
-            pts_to_poc_short = current_px - prev_poc
+        long_sl_dist = min(30.0, max(18.0, current_px - (c_low - 1.0)))
+        short_sl_dist = min(30.0, max(18.0, (c_high + 1.0) - current_px))
 
-            long_near_val = c_low <= (prev_val + PROXIMITY_BUFFER) or c_low <= (v_lower_band + PROXIMITY_BUFFER)
-            short_near_vah = c_high >= (prev_vah - PROXIMITY_BUFFER) or c_high >= (v_upper_band - PROXIMITY_BUFFER)
+        # 🟢 LONG ENTRY CHECK
+        trade_fired = False
+        if is_approved_green_window and is_pos_gamma and vwap_rising and long_near_val and (bottom_wick / c_range) >= 0.25 and c_close > prev_val and pts_to_poc_long >= 35.0:
+            print("\n🔥 ALERT: GRADE A+ LONG SETUP FIRED!")
+            execute_tradovate_order("Buy", c_close, long_sl_dist, prev_poc, window_label)
+            trade_fired = True
 
-            long_sl_dist = min(30.0, max(18.0, current_px - (c_low - 1.0)))
-            short_sl_dist = min(30.0, max(18.0, (c_high + 1.0) - current_px))
+        # 🔴 SHORT ENTRY CHECK
+        elif is_approved_green_window and is_pos_gamma and vwap_falling and short_near_vah and (top_wick / c_range) >= 0.25 and c_close < prev_vah and pts_to_poc_short >= 35.0:
+            print("\n🔥 ALERT: GRADE A+ SHORT SETUP FIRED!")
+            execute_tradovate_order("Sell", c_close, short_sl_dist, prev_poc, window_label)
+            trade_fired = True
 
-            # 🟢 LONG ENTRY CHECK
-            if not trade_executed_today and is_approved_green_window and is_pos_gamma and vwap_rising and long_near_val and (bottom_wick / c_range) >= 0.25 and c_close > prev_val and pts_to_poc_long >= 35.0:
-                print("\n🔥 ALERT: GRADE A+ LONG SETUP FIRED!")
-                trade_executed_today = execute_tradovate_order("Buy", c_close, long_sl_dist, prev_poc, window_label)
-
-            # 🔴 SHORT ENTRY CHECK
-            elif not trade_executed_today and is_approved_green_window and is_pos_gamma and vwap_falling and short_near_vah and (top_wick / c_range) >= 0.25 and c_close < prev_vah and pts_to_poc_short >= 35.0:
-                print("\n🔥 ALERT: GRADE A+ SHORT SETUP FIRED!")
-                trade_executed_today = execute_tradovate_order("Sell", c_close, short_sl_dist, prev_poc, window_label)
-
-    print(f"⏳ Live Watcher scanning candle @ {datetime.datetime.now().strftime('%H:%M:%S EST')}... Standing by.")
-    time.sleep(30)
-
-# End of Window Standby Heartbeat
-if not trade_executed_today:
-    heartbeat_msg = (
-        f"✅ <b>24/7 LIVE WATCHER WINDOW COMPLETE ({today_date})</b>\n\n"
-        f"💵 <b>NQ Last Price:</b> ${current_px:,.2f}\n"
-        f"📊 <b>Yesterday's POC Target:</b> ${prev_poc:,.2f}\n"
-        f"🟦 <b>Gamma Flip:</b> ${gamma_f:,.2f} ({'POS GAMMA ✅' if is_pos_gamma else 'NEG GAMMA 🛑'})\n"
-        f"💬 <b>Status:</b> Scanned 60 mins. No setup fired this window. Standing by!"
-    )
-    send_telegram_alert(heartbeat_msg)
+        if not trade_fired:
+            heartbeat_msg = (
+                f"✅ <b>24/7 MARKET CHECK COMPLETE ({today_date})</b>\n\n"
+                f"⏰ <b>Window:</b> <code>{window_label}</code> ({hr:02d}:{mn:02d} EST)\n"
+                f"💵 <b>NQ Last Price:</b> ${current_px:,.2f}\n"
+                f"📊 <b>Yesterday's POC Target:</b> ${prev_poc:,.2f}\n"
+                f"🟦 <b>Gamma Flip:</b> ${gamma_f:,.2f} ({'POS GAMMA ✅' if is_pos_gamma else 'NEG GAMMA 🛑'})\n"
+                f"💬 <b>Status:</b> Market checked. No setup right now. Standing by!"
+            )
+            send_telegram_alert(heartbeat_msg)
 
 print("=" * 80)
