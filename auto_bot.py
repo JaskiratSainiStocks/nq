@@ -8,7 +8,7 @@ import time
 import datetime
 
 print("=" * 85)
-print("🤖 100% PRODUCTION BOT: 60-MIN WATCHER + TICKSTREAM + TRADOVATE + NOTION")
+print("🤖 MASTER BOT v6.0 PRODUCTION ENGINE: TRADOVATE API + GEX + NOTION")
 print("=" * 85)
 
 # Load Encrypted Secrets from GitHub Environment
@@ -48,7 +48,7 @@ def send_telegram_alert(message_text):
     try:
         res = requests.post(telegram_url, json=payload, timeout=5)
         if res.status_code == 200:
-            print("📱 Telegram Notification Sent!")
+            print("📱 Telegram Push Notification Sent!")
     except Exception as e:
         print(f"❌ Telegram Error: {e}")
 
@@ -67,6 +67,7 @@ def check_telegram_remote_commands(current_px, gamma_f, is_pos_gamma, prev_poc):
                         f"💵 <b>Current Price:</b> ${current_px:,.2f}\n"
                         f"📊 <b>Yesterday's POC:</b> ${prev_poc:,.2f}\n"
                         f"🟦 <b>Gamma Flip:</b> ${gamma_f:,.2f} ({'POS GAMMA ✅' if is_pos_gamma else 'NEG GAMMA 🛑'})\n"
+                        f"📈 <b>Active Contract:</b> {CONTRACT_SYMBOL}\n"
                         f"🤖 <b>Bot Status:</b> Active & Listening 24/7!"
                     )
                     send_telegram_alert(status_reply)
@@ -137,7 +138,7 @@ def fetch_tickstream_gex(spot_price):
     return call_w, put_w, gamma_f
 
 # ---------------------------------------------------------------------
-# 4. TRADOVATE EXECUTION ENGINE (80/20 SCALING BRACKET)
+# 4. TRADOVATE LIVE EXECUTION ENGINE WITH ACCOUNT AUTO-DISCOVERY
 # ---------------------------------------------------------------------
 def execute_tradovate_order(action, entry_px, sl_pts, tp_px, window_name):
     sl_px = entry_px - sl_pts if action.lower() == "buy" else entry_px + sl_pts
@@ -153,25 +154,45 @@ def execute_tradovate_order(action, entry_px, sl_pts, tp_px, window_name):
     )
     
     if not TRADOVATE_USER or not TRADOVATE_PASS:
+        print("\n🧪 SIMULATION MODE: Running without Tradovate keys.")
         send_telegram_alert(f"🧪 <b>SIMULATION EXECUTION</b>\n\n{trade_summary}")
         log_trade_to_notion(str(datetime.date.today()), "06:35 AM PST", "WIN 🎯", action, 600.0, 5)
         return True
 
+    print("\n🔐 Authenticating with Tradovate API...")
     auth_url = "https://demo.tradovateapi.com/v1/auth/accesstokenrequest"
-    auth_payload = {"name": TRADOVATE_USER, "password": TRADOVATE_PASS, "appId": "NQ_Master_Bot_v5", "appVersion": "5.3"}
+    auth_payload = {"name": TRADOVATE_USER, "password": TRADOVATE_PASS, "appId": "NQ_Master_Bot_v6", "appVersion": "6.0"}
     
     try:
         res = requests.post(auth_url, json=auth_payload, timeout=10)
         auth_data = res.json()
-        if "accessToken" not in auth_data: return False
+        
+        if "accessToken" not in auth_data:
+            err_msg = auth_data.get("errorText", "Invalid User/Pass")
+            send_telegram_alert(f"❌ <b>TRADOVATE LOGIN FAILED:</b> {err_msg}")
+            return False
             
         access_token = auth_data["accessToken"]
         headers = {"Authorization": f"Bearer {access_token}"}
-        order_url = "https://demo.tradovateapi.com/v1/order/placeorder"
         
+        # Auto-Discover Tradovate Account ID
+        acct_url = "https://demo.tradovateapi.com/v1/account/list"
+        acct_res = requests.get(acct_url, headers=headers, timeout=10)
+        accts = acct_res.json()
+        
+        account_id = None
+        if isinstance(accts, list) and len(accts) > 0:
+            account_id = accts[0].get("id")
+            print(f"✅ Auto-Discovered Tradovate Account ID: {account_id}")
+
+        if not account_id:
+            account_id = int(TRADOVATE_ACCOUNT_ID) if TRADOVATE_ACCOUNT_ID and TRADOVATE_ACCOUNT_ID.isdigit() else 0
+
+        # Place Bracket Market Entry
+        order_url = "https://demo.tradovateapi.com/v1/order/placeorder"
         order_payload = {
             "accountSpec": TRADOVATE_USER,
-            "accountId": int(TRADOVATE_ACCOUNT_ID) if TRADOVATE_ACCOUNT_ID and TRADOVATE_ACCOUNT_ID.isdigit() else 0,
+            "accountId": account_id,
             "action": action,
             "symbol": CONTRACT_SYMBOL,
             "orderQty": 5,
@@ -180,6 +201,8 @@ def execute_tradovate_order(action, entry_px, sl_pts, tp_px, window_name):
         }
         
         order_res = requests.post(order_url, json=order_payload, headers=headers)
+        print(f"🚀 TRADOVATE ORDER RESPONSE: {order_res.json()}")
+        
         send_telegram_alert(f"⚡ <b>LIVE ORDER FIRED ACROSS FLEET!</b>\n\n{trade_summary}")
         log_trade_to_notion(str(datetime.date.today()), "06:35 AM PST", "WIN 🎯", action, 600.0, 5)
         return True
