@@ -2,8 +2,12 @@ name: Automated Pre-School Trading Bot
 
 on:
   schedule:
-    # Runs Monday-Friday at 13:35 UTC (06:35 AM PST / 09:35 AM EST)
-    - cron: '35 13 * * 1-5'
+    # 1. London Pre-US: 09:00 UTC (05:00 AM EST / 02:00 AM PST)
+    - cron: '0 9 * * 1-5'
+    # 2. NY Morning: 14:00 UTC (10:00 AM EST / 07:00 AM PST)
+    - cron: '0 14 * * 1-5'
+    # 3. NY Afternoon: 17:00 UTC (01:00 PM EST / 10:00 AM PST)
+    - cron: '0 17 * * 1-5'
   workflow_dispatch: # Allows manual 1-click test anytime!
 
 jobs:
