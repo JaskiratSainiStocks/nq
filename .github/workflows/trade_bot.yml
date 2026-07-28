@@ -2,9 +2,9 @@ name: Automated Pre-School Trading Bot
 
 on:
   schedule:
-    # Runs automatically Monday-Friday at 13:35 UTC (06:35 AM PST / 09:35 AM EST)
+    # Runs Monday-Friday at 13:35 UTC (06:35 AM PST / 09:35 AM EST)
     - cron: '35 13 * * 1-5'
-  workflow_dispatch: # Allows manual 1-click execution test anytime!
+  workflow_dispatch: # Allows manual 1-click test anytime!
 
 jobs:
   run-bot:
@@ -21,8 +21,15 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install yfinance pandas numpy
+          pip install yfinance pandas numpy requests
 
       - name: Execute Master Model 3.0 Bot
+        env:
+          TICKSTREAM_API_KEY: ${{ secrets.TICKSTREAM_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TRADOVATE_USER: ${{ secrets.TRADOVATE_USER }}
+          TRADOVATE_PASS: ${{ secrets.TRADOVATE_PASS }}
+          TRADOVATE_ACCOUNT_ID: ${{ secrets.TRADOVATE_ACCOUNT_ID }}
         run: |
           python auto_bot.py
