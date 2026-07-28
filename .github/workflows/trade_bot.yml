@@ -1,0 +1,28 @@
+name: Automated Pre-School Trading Bot
+
+on:
+  schedule:
+    # Runs automatically Monday-Friday at 13:35 UTC (06:35 AM PST / 09:35 AM EST)
+    - cron: '35 13 * * 1-5'
+  workflow_dispatch: # Allows manual 1-click execution test anytime!
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas numpy
+
+      - name: Execute Master Model 3.0 Bot
+        run: |
+          python auto_bot.py
