@@ -5,10 +5,10 @@ import requests
 import os
 
 print("=" * 80)
-print("🤖 24/7 AUTOMATED BOT: TICKSTREAM GEX API + MASTER 3.0 + TELEGRAM")
+print("🤖 24/7 PRODUCTION BOT: ALL 3 GREEN-LIGHT WINDOWS ENABLED")
 print("=" * 80)
 
-# Load Encrypted Secrets from GitHub Environment
+# Load Encrypted Secrets
 TICKSTREAM_API_KEY = os.environ.get("TICKSTREAM_API_KEY")
 TRADOVATE_USER = os.environ.get("TRADOVATE_USER")
 TRADOVATE_PASS = os.environ.get("TRADOVATE_PASS")
@@ -16,12 +16,11 @@ TRADOVATE_ACCOUNT_ID = os.environ.get("TRADOVATE_ACCOUNT_ID")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# ---------------------------------------------------------------------
-# 1. TELEGRAM PUSH NOTIFICATION SYSTEM
-# ---------------------------------------------------------------------
+CONTRACT_SYMBOL = "MNQU6"
+
 def send_telegram_alert(message_text):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print(f"📱 LOCAL LOG:\n{message_text}")
+        print(f"📱 LOCAL TELEGRAM LOG:\n{message_text}")
         return
 
     telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -30,40 +29,27 @@ def send_telegram_alert(message_text):
         "text": message_text,
         "parse_mode": "Markdown"
     }
-    
     try:
         res = requests.post(telegram_url, json=payload, timeout=5)
         if res.status_code == 200:
             print("📱 Telegram Push Notification Sent!")
-        else:
-            print(f"⚠️ Telegram API Response: {res.json()}")
     except Exception as e:
-        print(f"❌ Telegram Connection Error: {e}")
+        print(f"❌ Telegram Error: {e}")
 
-# ---------------------------------------------------------------------
-# 2. ENHANCED TICKSTREAM GEX API ENGINE
-# ---------------------------------------------------------------------
 def fetch_tickstream_gex(spot_price):
     if not TICKSTREAM_API_KEY:
-        print("⚠️ No TICKSTREAM_API_KEY found in GitHub Secrets. Using spot calibration.")
         call_w = round((spot_price + 120.0) / 50.0) * 50.0
         put_w = round((spot_price - 120.0) / 50.0) * 50.0
         gamma_f = round((spot_price - 25.0) / 25.0) * 25.0
         return call_w, put_w, gamma_f
 
-    print("\n📡 Connecting to TickStream API for live $NDX GEX levels...")
-    
-    # Try TickStream Endpoints with Multi-Header Auth
     endpoints = [
         "https://api.tickstream.com/v1/gex/NDX/latest",
-        "https://api.tickstream.io/v1/gex/NDX",
-        "https://api.tickstream.com/v1/gamma/NDX"
+        "https://api.tickstream.io/v1/gex/NDX"
     ]
-    
     headers_options = [
         {"Authorization": f"Bearer {TICKSTREAM_API_KEY}"},
-        {"X-API-Key": TICKSTREAM_API_KEY},
-        {"Authorization": f"Token {TICKSTREAM_API_KEY}"}
+        {"X-API-Key": TICKSTREAM_API_KEY}
     ]
 
     for url in endpoints:
@@ -72,39 +58,23 @@ def fetch_tickstream_gex(spot_price):
                 res = requests.get(url, headers=headers, timeout=5)
                 if res.status_code == 200:
                     data = res.json()
-                    
-                    # Robust key matching
-                    call_w = float(data.get("call_wall") or data.get("callWall") or data.get("call_wall_strike") or (spot_price + 120.0))
-                    put_w = float(data.get("put_wall") or data.get("putWall") or data.get("put_wall_strike") or (spot_price - 120.0))
-                    gamma_f = float(data.get("gamma_flip") or data.get("gammaFlip") or data.get("zero_gamma") or data.get("inflection") or (spot_price - 25.0))
-
-                    gex_msg = (
-                        f"📡 *LIVE TICKSTREAM GEX FETCHED!*\n\n"
-                        f"🟩 *Call Wall (Green):* `${call_w:,.2f}`\n"
-                        f"🟥 *Put Wall (Red):* `${put_w:,.2f}`\n"
-                        f"🟦 *Gamma Flip (Blue):* `${gamma_f:,.2f}`\n"
-                        f"📊 *Current Spot:* `${spot_price:,.2f}`"
-                    )
-                    print(f"✅ TICKSTREAM SUCCESS: Call Wall=${call_w}, Put Wall=${put_w}, Flip=${gamma_f}")
-                    send_telegram_alert(gex_msg)
+                    call_w = float(data.get("call_wall") or (spot_price + 120.0))
+                    put_w = float(data.get("put_wall") or (spot_price - 120.0))
+                    gamma_f = float(data.get("gamma_flip") or (spot_price - 25.0))
                     return call_w, put_w, gamma_f
-
             except Exception:
                 continue
 
-    print("⚠️ TickStream API unreachable or processing format. Using spot calibration fallback.")
     call_w = round((spot_price + 120.0) / 50.0) * 50.0
     put_w = round((spot_price - 120.0) / 50.0) * 50.0
     gamma_f = round((spot_price - 25.0) / 25.0) * 25.0
     return call_w, put_w, gamma_f
 
-# ---------------------------------------------------------------------
-# 3. TRADOVATE EXECUTION ENGINE
-# ---------------------------------------------------------------------
-def execute_tradovate_order(action, entry_px, sl_px, tp_px):
+def execute_tradovate_order(action, entry_px, sl_px, tp_px, window_name):
     trade_summary = (
         f"🚨 *GRADE A+ {action.upper()} SETUP FIRED!*\n\n"
-        f"📈 *Asset:* 5 Micro NQ (`5 MNQ`)\n"
+        f"⏰ *Window:* `{window_name}`\n"
+        f"📈 *Asset:* 5 Micro NQ (`{CONTRACT_SYMBOL}`)\n"
         f"💵 *Entry Price:* `${entry_px:,.2f}`\n"
         f"🛑 *Stop Loss:* `${sl_px:,.2f}` (-$300.00 Risk per acct)\n"
         f"🎯 *Take Profit 1 (80%):* `${tp_px:,.2f}` (Yesterday's POC)\n"
@@ -126,9 +96,7 @@ def execute_tradovate_order(action, entry_px, sl_px, tp_px):
     try:
         res = requests.post(auth_url, json=auth_payload, timeout=10)
         auth_data = res.json()
-        if "accessToken" not in auth_data:
-            send_telegram_alert("❌ *TRADOVATE AUTH ERROR*: Invalid API credentials.")
-            return
+        if "accessToken" not in auth_data: return
             
         access_token = auth_data["accessToken"]
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -138,7 +106,7 @@ def execute_tradovate_order(action, entry_px, sl_px, tp_px):
             "accountSpec": TRADOVATE_USER,
             "accountId": int(TRADOVATE_ACCOUNT_ID) if TRADOVATE_ACCOUNT_ID and TRADOVATE_ACCOUNT_ID.isdigit() else 0,
             "action": action,
-            "symbol": "MNQU6",
+            "symbol": CONTRACT_SYMBOL,
             "orderQty": 5,
             "orderType": "Market",
             "isAutomated": True
@@ -150,17 +118,11 @@ def execute_tradovate_order(action, entry_px, sl_px, tp_px):
     except Exception as e:
         send_telegram_alert(f"❌ *EXECUTION ERROR*: {str(e)}")
 
-# ---------------------------------------------------------------------
-# 4. MARKET STRUCTURE ENGINE & MASTER MODEL 3.0
-# ---------------------------------------------------------------------
-print("\n📥 Fetching live NQ market candles from Yahoo Finance...")
+# Market Data Engine
 ticker = yf.Ticker("NQ=F")
 df = ticker.history(period="5d", interval="5m")
 
-if df.empty:
-    print("❌ Failed to fetch market data.")
-    exit()
-
+if df.empty: exit()
 if isinstance(df.columns, pd.MultiIndex):
     df.columns = df.columns.get_level_values(0)
 
@@ -174,7 +136,6 @@ if len(unique_dates) < 2: exit()
 today_date = unique_dates[-1]
 prev_date = unique_dates[-2]
 
-# Compute Yesterday's Volume Profile (VAL, VAH, POC)
 prev_df = df[df["date"] == prev_date]
 pv = (prev_df["Close"] * prev_df["Volume"]).sum()
 vwap = pv / max(1, prev_df["Volume"].sum())
@@ -212,31 +173,42 @@ top_wick = c_high - max(c_open, c_close)
 vwap_rising = current_slope > 0.0 if not np.isnan(current_slope) else True
 vwap_falling = current_slope < 0.0 if not np.isnan(current_slope) else True
 
-# Fetch GEX Levels from TickStream Engine
 call_w, put_w, gamma_f = fetch_tickstream_gex(current_px)
 is_pos_gamma = current_px > gamma_f
 
-print(f"\n📊 MARKET STRUCTURE SUMMARY ({today_date}):")
-print(f"  • Current NQ Price : ${current_px:,.2f}")
-print(f"  • Yesterday's VAL  : ${prev_val:,.2f}")
-print(f"  • Yesterday's POC  : ${prev_poc:,.2f} [TARGET MAGNET]")
-print(f"  • Yesterday's VAH  : ${prev_vah:,.2f}")
-print(f"  • GEX Gamma Flip   : ${gamma_f:,.2f} ({'POS GAMMA ✅' if is_pos_gamma else 'NEG GAMMA 🛑'})")
+t_last = latest_candle["time"]
+hr, mn = t_last.hour, t_last.minute
+
+# CHECK ALL 3 GREEN-LIGHT WINDOWS (EST)
+is_window_1 = (hr == 10)                  # NY Morning (07:00 PST / 10:00 EST)
+is_window_2 = (hr == 13)                  # NY Afternoon (10:00 PST / 13:00 EST)
+is_window_3 = (hr == 5)                   # London Open (02:00 PST / 05:00 EST)
+
+is_approved_green_window = is_window_1 or is_window_2 or is_window_3
+
+window_label = "NY Morning" if is_window_1 else ("NY Afternoon" if is_window_2 else "London Open")
 
 pts_to_poc_long = prev_poc - current_px
 pts_to_poc_short = current_px - prev_poc
 
-# 🟢 MASTER MODEL 3.0 LONG CHECK
-if is_pos_gamma and vwap_rising and c_low <= prev_val and (bottom_wick / c_range) >= 0.25 and c_close > prev_val and pts_to_poc_long >= 35.0:
-    print("\n🔥 ALERT: GRADE A+ LONG SETUP FIRED!")
-    execute_tradovate_order("Buy", c_close, c_close - 30.0, prev_poc)
+# 🟢 MASTER LONG CHECK
+if is_approved_green_window and is_pos_gamma and vwap_rising and c_low <= prev_val and (bottom_wick / c_range) >= 0.25 and c_close > prev_val and pts_to_poc_long >= 35.0:
+    execute_tradovate_order("Buy", c_close, c_close - 30.0, prev_poc, window_label)
 
-# 🔴 MASTER MODEL 3.0 SHORT CHECK
-elif is_pos_gamma and vwap_falling and c_high >= prev_vah and (top_wick / c_range) >= 0.25 and c_close < prev_vah and pts_to_poc_short >= 35.0:
-    print("\n🔥 ALERT: GRADE A+ SHORT SETUP FIRED!")
-    execute_tradovate_order("Sell", c_close, c_close + 30.0, prev_poc)
+# 🔴 MASTER SHORT CHECK
+elif is_approved_green_window and is_pos_gamma and vwap_falling and c_high >= prev_vah and (top_wick / c_range) >= 0.25 and c_close < prev_vah and pts_to_poc_short >= 35.0:
+    execute_tradovate_order("Sell", c_close, c_close + 30.0, prev_poc, window_label)
 
 else:
-    print("\n🔵 STATUS: Market checked cleanly. No Grade A+ setup detected at current candle. Standing by.")
+    print(f"🔵 STATUS: Checked {window_label} window. No setup right now.")
+    heartbeat_msg = (
+        f"✅ *24/7 BOT CHECK COMPLETE ({today_date})*\n\n"
+        f"⏰ *Window:* `{window_label}` ({hr:02d}:{mn:02d} EST)\n"
+        f"💵 *NQ Price:* `${current_px:,.2f}`\n"
+        f"📊 *Yesterday's POC Target:* `${prev_poc:,.2f}`\n"
+        f"🟦 *Gamma Flip:* `${gamma_f:,.2f}` ({'POS GAMMA ✅' if is_pos_gamma else 'NEG GAMMA 🛑'})\n"
+        f"💬 *Status:* No Grade A+ setup right now. Standing by!"
+    )
+    send_telegram_alert(heartbeat_msg)
 
 print("=" * 80)
